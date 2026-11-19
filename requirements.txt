@@ -1,0 +1,9 @@
+numpy>=2.0
+scipy>=1.13
+numba>=0.60
+scikit-fmm>=2024.5
+threadpoolctl>=3.5
+# synthetic arrival generation (projects/forward_modeling) only
+pykonal==0.4.1
+# tests
+pytest>=8
