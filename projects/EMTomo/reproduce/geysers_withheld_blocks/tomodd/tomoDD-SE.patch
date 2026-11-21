@@ -1,0 +1,74 @@
+--- a/include/tomoFDD.inc
++++ b/include/tomoFDD.inc
+@@ -22,13 +22,13 @@
+         integer*8 s_tp, s_tpi, s_ts, s_tsi
+ 
+ c parameters for medium size problems (e.g. : SUN ULTRA-2, 768 MB RAM)
+-       parameter(MAXEVE=  1650,    
++       parameter(MAXEVE=  4000,    
+      &          MAXDATA= 1100000,
+      &          MAXEVE0=  2,	
+      &          MAXDATA0= 1,	
+      &          MAXLAY=   35,		
+      &          MAXSTA=   150,	
+-     &          MAXOBS=  120,
++     &          MAXOBS=   60,
+      &          MAXGRID=  8200000,	
+      &          MAXSEG=   10000,
+      &          MAXND=    80,
+--- a/RaySPDR2.f
++++ b/RaySPDR2.f
+@@ -210,7 +210,7 @@
+ !      mins   = 5.
+ 
+       flim   = 1.e-5
+-      mins   = 10. 
++      mins   = 5.00000000000000028d-02 
+ 
+       dpi = asin(1.)/ 90.
+       r2d = 90./asin(1.)
+@@ -837,8 +837,8 @@
+ ****  IF   *******************************************************
+ c     Where is the point - inside/outside of the region
+ 
+-      if(lo.GT.xn(1)+0.1.AND.lo.LT.xn(nx)-0.1.AND.la.GT.yn(1)+0.1
+-     &   .AND.la.LT.yn(ny)-0.1)then
++      if(lo.GT.xn(1).AND.lo.LT.xn(nx).AND.la.GT.yn(1)
++     &   .AND.la.LT.yn(ny))then
+       
+ c      inside of the study region
+ 
+--- a/transform_r_gfortran.c
++++ b/transform_r_gfortran.c
+@@ -159,7 +159,8 @@
+  
+         *z=(float)(0.5*(d1*d1+d2*d2-d3*d3)/d1); 
+  
+-        dist=sqrt(d2*d2-(double)((*z)*(*z))); 
++        /* Avoid cancellation against the already float-rounded z coordinate. */
++        dist=d3*sin(ddel/sfac); 
+  
+         *x=(float)dist*sin(daz/sfac); 
+         *y=(float)dist*cos(daz/sfac); 
+@@ -174,7 +175,7 @@
+  
+ int car2sph(float x,float y,float z,float *del,float *az,float *dep) 
+ { 
+-        double d1,d2,d3,sfac,dx,dy,dz; 
++        double d1,d2,d3,sfac,dx,dy,dz,cosdel; 
+  
+         sfac=180.0/3.1415926; 
+ 	dx=(double)x; 
+@@ -186,7 +187,11 @@
+         d1=6371.0; 
+         d2=sqrt(dx*dx+dy*dy+dz*dz); 
+         d3=sqrt(dx*dx+dy*dy+(dz-6371.0)*(dz-6371.0)); 
+-        *del=(float)(sfac*acos((d2*d2-d1*d1-d3*d3)/(-2.0*d1*d3))); 
++        cosdel=(d2*d2-d1*d1-d3*d3)/(-2.0*d1*d3);
++        /* Roundoff near the vertical axis can put cosdel outside [-1, 1]. */
++        if(cosdel>1.0) cosdel=1.0;
++        if(cosdel<-1.0) cosdel=-1.0;
++        *del=(float)(sfac*acos(cosdel)); 
+  
+         *dep=(float)d1-d3; 
+  

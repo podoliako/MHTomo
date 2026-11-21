@@ -1,0 +1,22 @@
+{
+ "recipe": "dd1-d40-s5",
+ "events": 3158,
+ "absolute_observations": 39531,
+ "differential_observations": 49829,
+ "pair_max_distance_km": 3.0,
+ "pair_max_degree": 4,
+ "start_locations": "unperturbed catalog locations of the training events",
+ "start_velocity": "linear Vp 3.5 km/s at the box top to 6.0 km/s at 7 km local depth, sampled at MOD nodes",
+ "file_sha256": {
+  "tomoDD-SE.inp": "2f52372334c0ae0b48e9e08d14a76cdb689083d596b13d6d2d5b7cded16e9cae",
+  "station.dat": "c0f5561f1aabcdee1af8e1aa1dc99ef294a0bec5331dc350d4288e2e432c3c11",
+  "event.dat": "daa67b71e10f92338b49b0e2d72d47b07f93b5d481bd7051c48e44e7a816d3b4",
+  "absolute.dat": "ab63ce1ff819da1cf27c301d048e00244465f5db23c912d479ac03e28b9e4a3b",
+  "dt.ct": "08a6f6403f57cec8bdda9bb1321159eced90cd708757ec8efd2d132172b6f08c",
+  "dt.cc": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "MOD": "3438009c3f5fc5eafd978b6d4e20850047807ecb4c19d9389e23140ade667c61",
+  "grid.dat": "533ccb96d374c9d06f5a7f820fbf27de09d91a522db1da59372fb59e5f1b73aa",
+  "layer-16.dat": "8921e57b6caea421d0ca3d45dce8f015688f489d2370deda38b286523a92abf4",
+  "ak135.15.SKS": "7744c108e13cb385762da76ded76c9444924dd48ceeab4ba719d3050fd3559fd"
+ }
+}

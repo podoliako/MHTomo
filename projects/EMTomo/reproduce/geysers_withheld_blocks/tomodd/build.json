@@ -1,0 +1,24 @@
+{
+ "source": "tomoDD-SE v1.0 as in the USTC tomoDD-SE training 2020 distribution (Src/tomoDD-SE); not redistributed here",
+ "changes": [
+  "include/tomoFDD.inc: MAXEVE 4000, MAXOBS 60",
+  "RaySPDR2.f: minimum ray segment 0.05 km; horizontal grid guard without the 0.1-degree offsets",
+  "transform_r_gfortran.c: round-off-safe sph2car/car2sph"
+ ],
+ "patch": "tomoDD-SE.patch (apply in Src/tomoDD-SE with patch -p1); all other files unchanged",
+ "compiler": "GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+ "compile_command": [
+  "/usr/bin/x86_64-linux-gnu-gfortran-13",
+  "-O3",
+  "-std=legacy",
+  "-fallow-argument-mismatch",
+  "-fno-automatic",
+  "-ffixed-line-length-none",
+  "-m64",
+  "-mcmodel=medium",
+  "-I<tomoDD-SE include directory>",
+  "-cpp",
+  "-Dmins=ray_min_segment_km"
+ ],
+ "original_source_sha256": "2d2d2890861f5c5ec9da69fc25eed01554a715faef838c105029a9e739883397"
+}

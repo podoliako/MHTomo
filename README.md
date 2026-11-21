@@ -55,12 +55,18 @@ start = np.load("data/geysers_2011/initial_models/linear_vp_3p5_6p0/initial_velo
 config = InversionConfig(cell_size=1000., subdivision=8, n_cycles=15, candidate_mode="soft",
                          n_candidates=50, weights_top_n=50, weights_min_distance=7,
                          weight_noise_relative_sigma=.01, weight_noise_absolute_sigma_s=.05,
-                         control_fraction=0., n_workers=12, runs_dir="runs")
+                         weight_model_sigma_s=.02, lambda_reg=1., coverage_damping_power=0.,
+                         max_velocity_step_fraction=.02, control_fraction=0., n_workers=12,
+                         runs_dir="runs")
 run_real_experiment(data, config, initial_model=VelocityModel(start, config.cell_size))
 ```
 
-Use `candidate_mode="hard"` (one candidate) for hard assignment. All settings and their meaning
-are documented in `config.py`. Results (models after each update, candidate weights, rays,
+Use `candidate_mode="hard"` (one candidate) for hard assignment. These are the settings of the
+article's real-data runs; the defaults in `config.py` differ (for example `lambda_reg`,
+`coverage_damping_power`, `weight_model_sigma_s`, `max_velocity_step_fraction`), so set them
+explicitly. All settings and their meaning are documented in `config.py`. This example uses all
+47,748 picks; the article's runs exclude an external pick holdout and a withheld event block
+(see *Reproducing the real-data test* below). Results (models after each update, candidate weights, rays,
 diagnostics) are written to `runs/`.
 
 ## Example data
@@ -73,6 +79,16 @@ Picks and catalog are from the NCEDC Enhanced Geothermal Systems (BG/LBNL) catal
 metadata from the NCEDC FDSN Station service. Please cite:
 NCEDC (2014), Northern California Earthquake Data Center. UC Berkeley Seismological Laboratory.
 Dataset. doi:10.7932/NCEDC.
+
+## Reproducing the real-data test
+
+`projects/EMTomo/reproduce/geysers_withheld_blocks/` contains everything needed to repeat the
+withheld-block test of the article (Section 4.7): the exact training archive (42,973 picks; the
+4775 picks of an earlier pick-level holdout are listed in `data/external_holdout_picks.csv`), the
+four withheld spheres and their event IDs (`blocks.json`), the hard/soft configurations
+(`configs.json`), the relocation/prediction role of every withheld pick (`evaluation_splits.csv`),
+the tomoDD-SE inputs of each block, and `reproduce.py` (prepare, invert, evaluate, score).
+See its `README.md`.
 
 ## Synthetic tests
 
