@@ -21,9 +21,13 @@ evaluate every model fixed: each withheld event is located from its relocation p
          (evaluation_splits.csv) by the grid likelihood, 50 seed cells with minimum separation 7
          cells on the 125-m grid and Powell refinement, without the catalog; its origin time is the
          precision-weighted mean offset on the relocation picks; its prediction picks are then
-         predicted. Predictions -> <out>/evaluation/<name>.npz.
+          predicted. Predictions -> <out>/evaluation/<name>.npz.
+         --split-seed K draws the relocation/prediction split anew with NumPy default_rng(K),
+         per withheld event in file order, count = min(max(1, round(0.2 n)), n - 5) prediction
+         picks; K = 42 gives evaluation_splits.csv, K = 43 and 44 the further splits of the article.
 score    pick-weighted prediction RMSE and paired event bootstrap (5000 draws, seed 20261118;
-         draws are generated for blocks in the order A, B, C, D, as in the article).
+         draws are generated for blocks in the order A, B, C, D, as in the article), per block and
+         pooled over the blocks (events resampled within blocks).
 """
 import argparse
 import csv
@@ -191,7 +195,20 @@ def split_mask(block, event_ids, station_ids):
     return mask, len(roles)
 
 
-def evaluate(block, out, models, workers):
+def seeded_split(observed, seed):
+    """Prediction mask of the article's split rule; seed 42 reproduces evaluation_splits.csv."""
+    rng = np.random.default_rng(seed)
+    mask = np.zeros(observed.shape, dtype=bool)
+    for row, values in enumerate(observed):
+        finite = np.flatnonzero(np.isfinite(values))
+        count = min(max(1, round(len(finite) * .2)), len(finite) - 5)
+        if count < 1:
+            raise ValueError('Every withheld event needs at least six picks')
+        mask[row, rng.choice(finite, count, replace=False)] = True
+    return mask
+
+
+def evaluate(block, out, models, workers, split_seed=None):
     from eikonal import station_travel_time_fields
     from velocity_model import VelocityModel
     from instruments.likelihood import PickNoise, negative_log_likelihood
@@ -199,8 +216,11 @@ def evaluate(block, out, models, workers):
     with np.load(out / 'withheld.npz', allow_pickle=False) as a:
         observed, event_ids, station_ids = a['arrival_times_s'], a['event_ids'], a['station_ids']
         stations = a['station_coordinates_m']
-    prediction, n_roles = split_mask(block, event_ids, station_ids)
-    assert n_roles == int(np.isfinite(observed).sum()), 'Split does not cover the withheld picks'
+    if split_seed is None:
+        prediction, n_roles = split_mask(block, event_ids, station_ids)
+        assert n_roles == int(np.isfinite(observed).sum()), 'Split does not cover the withheld picks'
+    else:
+        prediction = seeded_split(observed, split_seed)
     train = observed.copy()
     train[prediction] = np.nan
     noise = PickNoise(*NOISE)
@@ -227,6 +247,22 @@ def evaluate(block, out, models, workers):
               f'({prediction.sum()} picks, {time.monotonic() - started:.0f} s)', flush=True)
 
 
+def compare(sq, counts, draws):
+    n = counts[draws].sum(1)
+    rmse = {m: np.sqrt(v.sum() / counts.sum()) for m, v in sq.items()}
+    boot = {m: np.sqrt(v[draws].sum(1) / n) for m, v in sq.items()}
+    return rmse, boot
+
+
+def report(label, rmse, boot):
+    names = sorted(rmse, key=lambda m: (ORDER.index(m) if m in ORDER else len(ORDER), m))
+    print(f'{label}: ' + ', '.join(f'{m} {1000 * rmse[m]:.1f} ms' for m in names))
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            ci = np.quantile(100 * (boot[b] / boot[a] - 1), [.025, .975])
+            print(f'   {b} vs {a}: {100 * (rmse[b] / rmse[a] - 1):+.1f}% (95% {ci[0]:+.1f}, {ci[1]:+.1f})')
+
+
 def score(work):
     rng = np.random.default_rng(BOOT_SEED)
     pooled = {}
@@ -241,15 +277,7 @@ def score(work):
                 sq[path.stem] = np.where(mask, (a['predicted_relative_s'] - a['observed_s']) ** 2, 0).sum(1)
                 counts = mask.sum(1)
         draws = rng.integers(0, len(counts), size=(N_BOOT, len(counts)))
-        n = counts[draws].sum(1)
-        rmse = {m: np.sqrt(v.sum() / counts.sum()) for m, v in sq.items()}
-        boot = {m: np.sqrt(v[draws].sum(1) / n) for m, v in sq.items()}
-        names = sorted(sq, key=lambda m: (ORDER.index(m) if m in ORDER else len(ORDER), m))
-        print(f'block {block}: ' + ', '.join(f'{m} {1000 * rmse[m]:.1f} ms' for m in names))
-        for i, a in enumerate(names):
-            for b in names[i + 1:]:
-                ci = np.quantile(100 * (boot[b] / boot[a] - 1), [.025, .975])
-                print(f'   {b} vs {a}: {100 * (rmse[b] / rmse[a] - 1):+.1f}% (95% {ci[0]:+.1f}, {ci[1]:+.1f})')
+        report(f'block {block}', *compare(sq, counts, draws))
         pooled[block] = (sq, counts, draws)
     if len(pooled) > 1:
         names = set.intersection(*(set(v[0]) for v in pooled.values()))
@@ -262,9 +290,7 @@ def score(work):
                 sq[m].append(s[m])
         draws, counts = np.concatenate(draws, 1), np.concatenate(counts)
         sq = {m: np.concatenate(v) for m, v in sq.items()}
-        n = counts[draws].sum(1)
-        rmse = {m: np.sqrt(v.sum() / counts.sum()) for m, v in sq.items()}
-        print('pooled: ' + ', '.join(f'{m} {1000 * v:.1f} ms' for m, v in sorted(rmse.items())))
+        report(f'pooled ({"".join(pooled)})', *compare(sq, counts, draws))
 
 
 def main():
@@ -283,6 +309,7 @@ def main():
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--model', action='append', required=True, help='NAME=PATH.npy or NAME=tomodd:DIR')
     p.add_argument('--workers', type=int, default=12)
+    p.add_argument('--split-seed', type=int, help='draw the split with this seed instead of evaluation_splits.csv')
     p = sub.add_parser('score')
     p.add_argument('--work', type=Path, required=True)
     args = parser.parse_args()
@@ -291,7 +318,7 @@ def main():
     elif args.command == 'invert':
         invert(args.block, args.mode, args.out.resolve(), args.workers)
     elif args.command == 'evaluate':
-        evaluate(args.block, args.out.resolve(), args.model, args.workers)
+        evaluate(args.block, args.out.resolve(), args.model, args.workers, args.split_seed)
     else:
         score(args.work.resolve())
 
